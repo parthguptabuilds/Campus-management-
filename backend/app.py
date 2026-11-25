@@ -32,13 +32,7 @@ def add_cors_headers(response):
     return response
 
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY")
-supabase: Client | None = (
-    create_client(SUPABASE_URL, SUPABASE_KEY)
-    if SUPABASE_URL and SUPABASE_KEY
-    else None
-)
+supabase: Client | None = None
 
 
 class SupabaseConfigurationError(RuntimeError):
@@ -46,10 +40,22 @@ class SupabaseConfigurationError(RuntimeError):
 
 
 def get_supabase():
-    if supabase is None:
+    global supabase
+    if supabase is not None:
+        return supabase
+
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_PUBLISHABLE_KEY")
+    if not url or not key:
         raise SupabaseConfigurationError(
             "Supabase is not configured: set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY"
         )
+
+    try:
+        supabase = create_client(url, key)
+    except Exception as exc:
+        app.logger.error("Invalid Supabase configuration: %s", exc)
+        raise SupabaseConfigurationError("Supabase configuration is invalid") from exc
     return supabase
 
 
