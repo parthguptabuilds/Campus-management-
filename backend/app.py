@@ -101,7 +101,8 @@ def list_events():
         if status:
             query = query.eq("status", status)
         response = query.execute()
-        return jsonify(response.data), 200
+        events = response.data if isinstance(response.data, list) else []
+        return jsonify({"events": events}), 200
     except APIError as exc:
         return database_error(exc)
 

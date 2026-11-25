@@ -130,7 +130,8 @@ async function loadEvents() {
   elements.eventsList.innerHTML = '<div class="loading-card"><span class="spinner"></span> Loading campus events…</div>';
   showMessage(elements.eventsState, "");
   try {
-    events = await api.listEvents(elements.status.value);
+    const result = await api.listEvents(elements.status.value);
+    events = Array.isArray(result) ? result : [];
     renderEvents();
   } catch (error) {
     events = [];

@@ -1,4 +1,4 @@
-const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "https://campus-management-5.onrender.com").replace(/\/+$/, "");
 
 function normalizeKeys(value) {
   if (Array.isArray(value)) return value.map(normalizeKeys);
@@ -51,7 +51,17 @@ export const api = {
   health: () => request("/"),
   listEvents: (status = "") => {
     const query = status ? `?status=${encodeURIComponent(status)}` : "";
-    return request(`/api/events${query}`);
+    return request(`/api/events${query}`).then((payload) => {
+      if (Array.isArray(payload)) return payload;
+      if (!payload || typeof payload !== "object" || payload.error) return [];
+
+      const events = Array.isArray(payload.events)
+        ? payload.events
+        : Array.isArray(payload.data)
+          ? payload.data
+          : [];
+      return events;
+    });
   },
   getEvent: (eventId) => request(`/api/events/${encodeURIComponent(eventId)}`),
   createRegistration: (userId, eventId) =>
