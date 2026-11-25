@@ -34,11 +34,29 @@ def add_cors_headers(response):
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY")
+supabase: Client | None = (
+    create_client(SUPABASE_URL, SUPABASE_KEY)
+    if SUPABASE_URL and SUPABASE_KEY
+    else None
+)
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise RuntimeError("Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in the environment")
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+class SupabaseConfigurationError(RuntimeError):
+    """Raised when an API route needs Supabase but its environment is missing."""
+
+
+def get_supabase():
+    if supabase is None:
+        raise SupabaseConfigurationError(
+            "Supabase is not configured: set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY"
+        )
+    return supabase
+
+
+@app.errorhandler(SupabaseConfigurationError)
+def handle_supabase_configuration_error(exc):
+    app.logger.error("Supabase configuration error: %s", exc)
+    return error(str(exc), 503)
 
 
 def error(message: str, status: int):
@@ -72,7 +90,7 @@ def index():
 @app.get("/api/events")
 def list_events():
     try:
-        query = supabase.table("events").select("*")
+        query = get_supabase().table("events").select("*")
         status = request.args.get("status")
         if status:
             query = query.eq("status", status)
@@ -88,7 +106,7 @@ def get_event(event_id):
     if not event_id:
         return error("event id must be a UUID", 400)
     try:
-        response = supabase.table("events").select("*").eq("id", event_id).maybe_single().execute()
+        response = get_supabase().table("events").select("*").eq("id", event_id).maybe_single().execute()
         if response.data is None:
             return error("Event not found", 404)
         return jsonify(response.data), 200
@@ -108,7 +126,7 @@ def create_registration():
 
     try:
         event_response = (
-            supabase.table("events")
+            get_supabase().table("events")
             .select("id, capacity, status")
             .eq("id", event_id)
             .maybe_single()
@@ -121,7 +139,7 @@ def create_registration():
             return error("Event is not open for registration", 409)
 
         existing = (
-            supabase.table("registrations")
+            get_supabase().table("registrations")
             .select("id")
             .eq("user_id", user_id)
             .eq("event_id", event_id)
@@ -134,7 +152,7 @@ def create_registration():
         capacity = event.get("capacity")
         if capacity is not None:
             registrations = (
-                supabase.table("registrations")
+                get_supabase().table("registrations")
                 .select("id", count="exact")
                 .eq("event_id", event_id)
                 .execute()
@@ -144,7 +162,7 @@ def create_registration():
                 return error("Event is at capacity", 409)
 
         created = (
-            supabase.table("registrations")
+            get_supabase().table("registrations")
             .insert({"user_id": user_id, "event_id": event_id})
             .execute()
         )
@@ -161,7 +179,7 @@ def my_registrations():
         return error("Provide a valid user_id query parameter", 400)
     try:
         response = (
-            supabase.table("registrations")
+            get_supabase().table("registrations")
             .select("*, events(*)")
             .eq("user_id", user_id)
             .order("created_at", desc=True)
@@ -179,12 +197,12 @@ def event_registrations(event_id):
         return error("event id must be a UUID", 400)
     try:
         event_response = (
-            supabase.table("events").select("id").eq("id", event_id).maybe_single().execute()
+            get_supabase().table("events").select("id").eq("id", event_id).maybe_single().execute()
         )
         if event_response.data is None:
             return error("Event not found", 404)
         response = (
-            supabase.table("registrations")
+            get_supabase().table("registrations")
             .select("*, users(id, email, role)")
             .eq("event_id", event_id)
             .order("created_at")
