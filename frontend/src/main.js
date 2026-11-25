@@ -65,8 +65,13 @@ function showToast(message, kind = "success") {
 }
 
 function renderEvents() {
+  const eventList = Array.isArray(events)
+    ? events
+    : Array.isArray(events?.events)
+      ? events.events
+      : [];
   const search = elements.search.value.trim().toLowerCase();
-  const visibleEvents = events.filter((event) =>
+  const visibleEvents = eventList.filter((event) =>
     `${eventTitle(event)} ${event.description || ""} ${eventLocation(event)}`
       .toLowerCase()
       .includes(search),

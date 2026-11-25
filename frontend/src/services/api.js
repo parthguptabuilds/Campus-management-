@@ -35,8 +35,8 @@ async function request(path, options = {}) {
   }
 
   if (!response.ok) {
-    const message = data && typeof data === "object" && data.error
-      ? data.error
+    const message = data && typeof data === "object" && (data.error || data.message)
+      ? (data.error || data.message)
       : `Request failed (${response.status})`;
     if (response.status === 401) {
       sessionStorage.removeItem("access_token");
@@ -53,13 +53,16 @@ export const api = {
     const query = status ? `?status=${encodeURIComponent(status)}` : "";
     return request(`/api/events${query}`).then((payload) => {
       if (Array.isArray(payload)) return payload;
-      if (!payload || typeof payload !== "object" || payload.error) return [];
+      if (!payload || typeof payload !== "object") return [];
 
       const events = Array.isArray(payload.events)
         ? payload.events
         : Array.isArray(payload.data)
           ? payload.data
           : [];
+      if (!events.length && (payload.error || payload.message)) {
+        throw new Error(payload.error || payload.message);
+      }
       return events;
     });
   },
